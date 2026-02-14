@@ -1,0 +1,280 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+/* =======================
+   USER
+======================= */
+model User {
+  id            Int           @id @default(autoincrement())
+  name          String?
+  email         String?       @unique
+  phone         String?       @unique
+  passwordHash  String?
+  avatar        String?
+  role          String        @default("USER")
+  active        Boolean       @default(true)
+  phoneVerified Boolean       @default(false)
+  
+  otp           Otp[]
+  ads           Ad[]
+  bookings      Booking[]
+  products      Product[]
+  reservations  Reservation[]
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Otp {
+  id        Int      @id @default(autoincrement())
+  code      String
+  type      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([code])
+}
+
+/* =======================
+   CITY / SECTOR
+======================= */
+model City {
+  id      Int      @id @default(autoincrement())
+  name    String   @unique
+  sectors Sector[]
+  ads     Ad[]
+  products Product[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Sector {
+  id     Int    @id @default(autoincrement())
+  name   String
+  cityId Int
+  city   City   @relation(fields: [cityId], references: [id])
+  ads    Ad[]
+  products Product[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([name, cityId])
+}
+
+/* =======================
+   CATEGORY / SUBCATEGORY
+======================= */
+model Category {
+  id            Int           @id @default(autoincrement())
+  name          String
+  slug          String        @unique
+  icon          String?
+  description   String?
+  subcategories SubCategory[]
+  ads           Ad[]
+  products      Product[]
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model SubCategory {
+  id          Int         @id @default(autoincrement())
+  name        String
+  slug        String
+  description String?
+  
+  categoryId  Int
+  category    Category    @relation(fields: [categoryId], references: [id])
+  ads         Ad[]
+  products    Product[]
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  @@unique([slug, categoryId])
+  @@index([categoryId])
+}
+
+/* =======================
+   AD (ANNONCE CLASSIQUE)
+======================= */
+model Ad {
+  id              Int             @id @default(autoincrement())
+  title           String
+  description     String?         @db.Text
+  price           Float?
+  surface         Int?
+  rooms           Int?
+  address         String
+  hidePhone       Boolean         @default(false)
+  status          String          @default("pending")
+  isPremium       Boolean         @default(false)
+  image           String?
+  
+  userId          Int
+  user            User            @relation(fields: [userId], references: [id])
+  
+  categoryId      Int
+  category        Category        @relation(fields: [categoryId], references: [id])
+  
+  subcategoryId   Int?
+  subcategory     SubCategory?    @relation(fields: [subcategoryId], references: [id])
+  
+  cityId          Int
+  city            City            @relation(fields: [cityId], references: [id])
+  
+  sectorId        Int?
+  sector          Sector?         @relation(fields: [sectorId], references: [id])
+  
+  images          AdImage[]
+  bookings        Booking[]
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  active          Boolean @default(true)
+  @@index([userId])
+  @@index([categoryId])
+  @@index([cityId])
+  @@index([status])
+}
+
+model AdImage {
+  id    Int    @id @default(autoincrement())
+  url   String
+  adId  Int
+  ad    Ad     @relation(fields: [adId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+}
+
+/* =======================
+   PRODUCT (HÉBERGEMENT/VACANCES)
+======================= */
+model Product {
+  id              Int               @id @default(autoincrement())
+  title           String
+  description     String            @db.Text
+  price           Float
+  pricePer        String            @default("night")
+  maxGuests       Int               @default(2)
+  bedrooms        Int               @default(1)
+  bathrooms       Int               @default(1)
+  address         String?
+  latitude        Float?
+  longitude       Float?
+  status          String            @default("active")
+  isFeatured      Boolean           @default(false)
+  mainImage       String?
+  
+  // Relations - CORRIGÉES
+  userId          Int
+  user            User              @relation(fields: [userId], references: [id])
+  
+  cityId          Int
+  city            City              @relation(fields: [cityId], references: [id])
+  
+  sectorId        Int?
+  sector          Sector?           @relation(fields: [sectorId], references: [id])
+  
+  categoryId      Int
+  category        Category          @relation(fields: [categoryId], references: [id])
+  
+  subCategoryId   Int?
+  subCategory     SubCategory?      @relation(fields: [subCategoryId], references: [id])
+  
+  // Listes
+  images          ProductImage[]
+  reservations    Reservation[]
+  active          Boolean @default(true)
+  // Timestamps
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  @@index([userId])
+  @@index([cityId])
+  @@index([categoryId])
+  @@index([status])
+}
+
+/* =======================
+   PRODUCT IMAGES
+======================= */
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  url       String
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@index([productId])
+}
+
+/* =======================
+   BOOKING (POUR ADS)
+======================= */
+model Booking {
+  id        Int      @id @default(autoincrement())
+  
+  adId      Int
+  ad        Ad       @relation(fields: [adId], references: [id])
+  
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  
+  startDate DateTime
+  endDate   DateTime
+  
+  status    String   @default("pending")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([adId])
+  @@index([userId])
+}
+
+/* =======================
+   RESERVATION (POUR PRODUCTS)
+======================= */
+model Reservation {
+  id            Int          @id @default(autoincrement())
+  
+  userId        Int
+  user          User         @relation(fields: [userId], references: [id])
+  
+  productId     Int
+  product       Product      @relation(fields: [productId], references: [id])
+  
+  startDate     DateTime
+  endDate       DateTime
+  guests        Int          @default(1)
+  totalPrice    Float
+  status        String       @default("pending")
+  
+  guestName     String
+  guestPhone    String
+  guestEmail    String?
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  @@index([userId])
+  @@index([productId])
+  @@index([status])
+}
